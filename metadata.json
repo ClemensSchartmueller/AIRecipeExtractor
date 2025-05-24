@@ -1,0 +1,6 @@
+{
+  "name": "AI Recipe Extractor",
+  "description": "Upload a screenshot of a cooking recipe, and this app will use AI to extract the text, making it easy for you to copy and use. It leverages Gemini API for accurate text extraction from images.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

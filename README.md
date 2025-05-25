@@ -46,7 +46,7 @@ The goal is to make it easy for you to get recipes from images (like those from 
 
 *   **API Key**: This application requires a Google Generative AI API key. The application code (`services/geminiService.ts`) directly uses `process.env.API_KEY` to initialize the AI client. You **must** ensure this environment variable is set in the execution context where the application runs.
 
-### Setting the `GEMINI_API_KEY` Environment Variable
+### Setting the `API_KEY` Environment Variable
 
 How you set this variable depends on your development and deployment environment. Here are common methods:
 
@@ -58,7 +58,7 @@ How you set this variable depends on your development and deployment environment
    a. Create a file named `.env` in the root directory of the project.
    b. Add your API key to this file:
       ```
-      GEMINI_API_KEY="YOUR_ACTUAL_GOOGLE_GEMINI_API_KEY"
+      API_KEY="YOUR_ACTUAL_GOOGLE_GEMINI_API_KEY"
       ```
    c. **Important**: Add `.env` to your `.gitignore` file to prevent accidentally committing your API key to version control.
       ```
@@ -72,15 +72,15 @@ How you set this variable depends on your development and deployment environment
 
    *   **Linux/macOS (bash/zsh):**
        ```bash
-       export GEMINI_API_KEY="YOUR_ACTUAL_GOOGLE_GEMINI_API_KEY"
+       export API_KEY="YOUR_ACTUAL_GOOGLE_GEMINI_API_KEY"
        ```
    *   **Windows (Command Prompt):**
        ```cmd
-       set GEMINI_API_KEY="YOUR_ACTUAL_GOOGLE_GEMINI_API_KEY"
+       set API_KEY="YOUR_ACTUAL_GOOGLE_GEMINI_API_KEY"
        ```
    *   **Windows (PowerShell):**
        ```powershell
-       $env:GEMINI_API_KEY="YOUR_ACTUAL_GOOGLE_GEMINI_API_KEY"
+       $env:API_KEY="YOUR_ACTUAL_GOOGLE_GEMINI_API_KEY"
        ```
    After setting it, if you are using a development server, you might need to restart it.
 
@@ -100,6 +100,11 @@ How you set this variable depends on your development and deployment environment
 4.  Upload an image of a recipe using the uploader.
 5.  The AI will process the image and display the extracted recipe and a generated dish image.
 6.  You can then copy the text or JSON output, or download the generated dish image.
+
+## DEPLOYING
+1. To deploy, make sure to add a `ALLOWED_HOSTS` environment variable with allowed domains pointing at the host (e.g. `ALLOWED_HOSTS=aire.abc`).
+2. Build the application `npm run build`.
+3. Run the application with `--host` flag (to enable exposing) by executing `npx vite --host`.
 
 ## Contributing
 

@@ -239,16 +239,19 @@ export const RecipeDisplay: React.FC<RecipeDisplayProps> = ({
           )}
         </div>
 
-        {(recipeData.dishImageDescription || isGeneratingDishImage || generatedDishImageUrl || dishImageError) && (
+        {/* Corrected conditional rendering for the entire dish image section */}
+        {(isGeneratingDishImage || generatedDishImageUrl || dishImageError) && (
           <div className="pt-6 border-t border-slate-200">
             <h3 className="text-xl font-semibold text-slate-800 mb-3">Illustrative Dish Image</h3>
             {isGeneratingDishImage && (
               <div className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-lg shadow-sm">
                 <LoadingSpinner />
                 <p className="mt-3 text-sm text-slate-600">Generating dish image based on description...</p>
+                {/* Display description only if an attempt is being made and description exists */}
                 {recipeData.dishImageDescription && <p className="mt-1 text-xs text-slate-500 italic">"{recipeData.dishImageDescription}"</p>}
               </div>
             )}
+            {/* This error message is set in App.tsx if generation was attempted and failed/returned null/no description */}
             {dishImageError && !isGeneratingDishImage && (
               <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-3 rounded-md text-sm" role="alert">
                   <p><strong className="font-semibold">Image Generation Note:</strong> {dishImageError}</p>
@@ -270,12 +273,16 @@ export const RecipeDisplay: React.FC<RecipeDisplayProps> = ({
                 </button>
               </div>
             )}
+            {/* The following two paragraphs were causing confusion and are effectively replaced by the dishImageError handling from App.tsx */}
+            {/* when an actual attempt to generate an image was made. If no attempt was made (checkbox unchecked), this whole section is hidden. */}
+            {/*
             {!isGeneratingDishImage && !generatedDishImageUrl && !dishImageError && recipeData.dishImageDescription && (
               <p className="text-sm text-slate-500">Could not generate an image for "{recipeData.dishImageDescription}".</p>
             )}
             {!isGeneratingDishImage && !generatedDishImageUrl && !dishImageError && !recipeData.dishImageDescription && (
               <p className="text-sm text-slate-500">No specific dish image description was found in the recipe to generate an image from.</p>
             )}
+            */}
           </div>
         )}
       </div>

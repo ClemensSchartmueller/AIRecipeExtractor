@@ -4,7 +4,7 @@ import { ImageUploader } from './components/ImageUploader';
 import { RecipeDisplay } from './components/RecipeDisplay';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { OutputFormatSelector } from './components/OutputFormatSelector';
-import { GenerateImageCheckbox } from './components/GenerateImageCheckbox'; // New import
+import { GenerateImageCheckbox } from './components/GenerateImageCheckbox';
 import { extractRecipeFromImage, generateDishImage } from './services/geminiService';
 import { fileToBase64 } from './utils/imageUtils';
 import { RecipeData, OutputFormat } from './types';
@@ -16,7 +16,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('text');
-  const [shouldGenerateDishImage, setShouldGenerateDishImage] = useState<boolean>(true); // New state
+  const [shouldGenerateDishImage, setShouldGenerateDishImage] = useState<boolean>(true);
 
   const [generatedDishImageUrl, setGeneratedDishImageUrl] = useState<string | null>(null);
   const [isGeneratingDishImage, setIsGeneratingDishImage] = useState<boolean>(false);
@@ -29,10 +29,13 @@ const App: React.FC = () => {
     setImagePreviewUrl(previewUrl);
     setRecipeData(null);
     setError(null);
+    
+    // Reset image generation states for every new upload
     setGeneratedDishImageUrl(null);
     setDishImageError(null);
+    setIsGeneratingDishImage(false);
+    
     setIsLoading(true);
-    setIsGeneratingDishImage(false); 
 
     try {
       const imageBase64 = await fileToBase64(file);
@@ -40,28 +43,32 @@ const App: React.FC = () => {
       setRecipeData(extractedData);
       setError(null); 
 
-      if (shouldGenerateDishImage && extractedData && extractedData.dishImageDescription) {
-        setIsGeneratingDishImage(true);
-        setDishImageError(null);
-        try {
-          const dishImageResult = await generateDishImage(extractedData.dishImageDescription);
-          if (dishImageResult) {
-            setGeneratedDishImageUrl(`data:${dishImageResult.mimeType};base64,${dishImageResult.base64Data}`);
-          } else {
-            console.log("No dish image was generated for the description.");
-          }
-        } catch (imgErr) {
+      // Image Generation Logic
+      if (shouldGenerateDishImage) {
+        if (extractedData && extractedData.dishImageDescription) {
+          setIsGeneratingDishImage(true);
+          // dishImageError is already null from the reset above
+          try {
+            const dishImageResult = await generateDishImage(extractedData.dishImageDescription);
+            if (dishImageResult) {
+              setGeneratedDishImageUrl(`data:${dishImageResult.mimeType};base64,${dishImageResult.base64Data}`);
+              // dishImageError remains null (success)
+            } else {
+              // API returned null, but no error thrown
+              setDishImageError("An image could not be generated based on the description (the AI did not return an image).");
+            }
+          } catch (imgErr) {
             console.error("Error generating dish image:", imgErr);
             setDishImageError(imgErr instanceof Error ? imgErr.message : "Failed to generate dish image.");
-        } finally {
+          } finally {
             setIsGeneratingDishImage(false);
+          }
+        } else { // shouldGenerateDishImage is true, but no description from recipe
+          setDishImageError("No dish image description was found in the recipe to generate an image from.");
+          // isGeneratingDishImage remains false as no API call is made
         }
-      } else {
-        // If not generating image, ensure related states are reset
-        setGeneratedDishImageUrl(null);
-        setIsGeneratingDishImage(false);
-        setDishImageError(null);
       }
+      // If shouldGenerateDishImage is false, image states (URL, error, loading) remain at their reset values (null/false)
 
     } catch (err) {
       console.error("Error in handleImageUpload:", err);
@@ -71,7 +78,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false); 
     }
-  }, [shouldGenerateDishImage]); // Added dependency
+  }, [shouldGenerateDishImage]);
 
   const clearSelection = () => {
     setSelectedFile(null);

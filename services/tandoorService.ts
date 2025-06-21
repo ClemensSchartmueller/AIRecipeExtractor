@@ -57,23 +57,22 @@ export async function exportToTandoor(
     description: recipeData.description ? recipeData.description.substring(0, 512) : null,
     keywords: [],
     steps: [],
-    source_url: null, // Default, can be overridden if recipeData has a URL
+    source_url: null, 
     internal: false,
-    show_ingredient_overview: false,
-    nutrition: {
-        carbohydrates: "",
-        fats: "",
-        proteins: "",
-        calories: "",
+    show_ingredient_overview: false, // Default from Tandoor empty example
+    nutrition: { // Default numeric values, aligning with Tandoor example for numbers
+        carbohydrates: 0,
+        fats: 0,
+        proteins: 0,
+        calories: 0,
         source: ""
     },
     properties: [],
-    file_path: "",
-    private: false,
-    shared: []
+    file_path: "", // Default from Tandoor empty example
+    private: false, // Default from Tandoor empty example
+    shared: [] // Default from Tandoor empty example
   };
 
-  // Conditionally add time-related fields if they have values
   const workingTime = isoDurationToMinutes(recipeData.prepTime);
   if (workingTime !== null) {
     tandoorPayload.working_time = workingTime;
@@ -84,7 +83,6 @@ export async function exportToTandoor(
     tandoorPayload.waiting_time = waitingTime;
   }
   
-  // Populate steps according to detailed Tandoor example
   if (recipeData.recipeInstructions && Array.isArray(recipeData.recipeInstructions)) {
     tandoorPayload.steps = recipeData.recipeInstructions.map((instructionItem: string | HowToStep, index: number) => {
       let instructionText = "";
@@ -93,72 +91,71 @@ export async function exportToTandoor(
       } else if (typeof instructionItem === 'object' && instructionItem.text) {
         instructionText = instructionItem.text;
       } else {
-        instructionText = String(instructionItem); // Fallback
+        instructionText = String(instructionItem); 
       }
       
       const stepObject: { [key: string]: any } = {
+        name: "", 
+        type: "TEXT", // Added based on Tandoor "Beef Madras Tostadas" example
         instruction: instructionText,
-        name: "", // Tandoor example has 'name' for step, can be empty
-        ingredients: [], // Initialize ingredients array for each step
-        order: index,    // Tandoor example has 'order'
-        show_as_header: false, // Default
-        show_ingredients_table: false // Default
-        // 'time' field is omitted from step object
+        ingredients: [], 
+        time: 0, // Added based on Tandoor "Beef Madras Tostadas" example (integer)
+        order: index,    
+        show_as_header: false, // Default, not in "Beef Madras Tostadas" step items but common
+        // show_ingredients_table: false, // Removed as it's not in the "Beef Madras Tostadas" step example
       };
       return stepObject;
     }).filter(step => step.instruction.trim() !== "");
   }
+
   if (!tandoorPayload.steps || tandoorPayload.steps.length === 0) {
-     tandoorPayload.steps = [{ // Add a default empty step if none were parsed, so ingredients can be added
-        instruction: "No instructions provided.",
+     tandoorPayload.steps = [{ 
         name: "",
+        type: "TEXT",
+        instruction: "No instructions provided.",
         ingredients: [],
+        time: 0,
         order: 0,
         show_as_header: false,
-        show_ingredients_table: false
      }];
   }
 
-  // Add all ingredients to the first step
+  // Add all ingredients to the first step, matching "Beef Madras Tostadas" example structure for ingredients
   if (tandoorPayload.steps.length > 0 && recipeData.recipeIngredient && Array.isArray(recipeData.recipeIngredient)) {
     recipeData.recipeIngredient.forEach((ingredientString, index) => {
-        const tandoorIngredient = {
-            food: { 
-                name: ingredientString.substring(0, 128), // Max length for food name
-                plural_name: "", // Default
-                description: "", // Default
-                // recipe: null, // Omit complex nested objects not directly available
-                // url: null,
-                // properties: [],
-                // properties_food_amount: null,
-                // properties_food_unit: null,
-                // fdc_id: null,
-                // food_onhand: null,
-                // supermarket_category: null,
-                // inherit_fields: [],
-                // ignore_shopping: false,
-                // substitute: [],
-                // substitute_siblings: false,
-                // substitute_children: false,
-                // child_inherit_fields: [],
-                open_data_slug: null // Default
-            },
-            unit: { 
-                name: "", // We don't parse unit
-                plural_name: "", // Default
-                description: "", // Default
-                base_unit: null, // Default
-                open_data_slug: null // Default
-            },
-            amount: "", // We don't parse amount
-            note: "", // Default
-            order: index, // Order within the step's ingredients list
-            is_header: false, // Default
-            no_amount: true, // Since we are not providing a parsed amount
-            original_text: ingredientString,
-            always_use_plural_unit: false, // Default
-            always_use_plural_food: false // Default
-        };
+        // Basic heuristic for potential headers (e.g., "For the sauce:")
+        // This is very simple; more robust parsing would be needed for complex cases.
+        const isLikelyHeader = /^(For the .*?:|Sauce:|Marinade:|Dressing:)/i.test(ingredientString.trim()) || ingredientString.trim().endsWith(':');
+
+        let tandoorIngredient;
+        if (isLikelyHeader) {
+            tandoorIngredient = {
+                food: null, // As per Tandoor example for headers
+                unit: { name: "g", description: null }, // Example default unit for headers
+                amount: "0", // Example default amount for headers
+                note: ingredientString.trim(), // Header text goes into note
+                order: index,
+                is_header: true,
+                no_amount: false, // Example headers had no_amount: false
+            };
+        } else {
+            tandoorIngredient = {
+                food: { 
+                    name: ingredientString.substring(0, 128).trim(),
+                    ignore_shopping: false, // Default from Tandoor "Beef Madras Tostadas" example
+                    supermarket_category: null // Default from Tandoor "Beef Madras Tostadas" example
+                },
+                unit: { 
+                    name: "g", // Placeholder unit name from example
+                    description: null 
+                },
+                amount: "0", // String "0" as per Tandoor example for listed items
+                note: "", 
+                order: index, 
+                is_header: false, 
+                no_amount: true, // Since amount "0" is a placeholder for an unparsed amount
+            };
+        }
         tandoorPayload.steps[0].ingredients.push(tandoorIngredient);
     });
   }
@@ -186,8 +183,7 @@ export async function exportToTandoor(
     const trimmedCui = recipeData.recipeCuisine.trim();
     if (trimmedCui) keywordsSet.add(trimmedCui);
   }
-  // Tandoor keywords are objects: { name: "string", description: "string" }
-  tandoorPayload.keywords = Array.from(keywordsSet).map(kw => ({ name: kw.substring(0, 128), description: "" })); // Ensure keyword name length
+  tandoorPayload.keywords = Array.from(keywordsSet).map(kw => ({ name: kw.substring(0, 128), description: "" }));
   
   try {
     const response = await fetch(apiUrl, {
@@ -243,7 +239,7 @@ export async function exportToTandoor(
         throw new Error(`Network error or Tandoor instance unreachable. Check URL and CORS settings on your Tandoor instance if this is a self-hosted setup. Original: ${error.message}`);
     }
     if (error instanceof Error) {
-        throw error; // Rethrow the already specific error
+        throw error; 
     }
     throw new Error(`An unexpected error occurred during Tandoor export: ${String(error)}`);
   }

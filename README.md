@@ -101,6 +101,11 @@ How you set this variable depends on your development and deployment environment
 5.  The AI will process the image and display the extracted recipe and a generated dish image.
 6.  You can then copy the text or JSON output, or download the generated dish image.
 
+## DEPLOYING
+1. To deploy, make sure to add a `ALLOWED_HOSTS` environment variable with allowed domains pointing at the host (e.g. `ALLOWED_HOSTS=aire.abc`).
+2. Build the application `npm run build`.
+3. Run the application with `--host` flag (to enable exposing) by executing `npx vite --host`.
+
 ## Contributing
 
 As mentioned, this project is AI-generated and may not be actively maintained by its "creator". However, community contributions are highly encouraged!

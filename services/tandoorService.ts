@@ -14,7 +14,11 @@ function isoDurationToMinutes(durationStr: string | null | undefined): number | 
   const minutes = parseInt(matches[2] || '0', 10);
   const seconds = parseInt(matches[3] || '0', 10);
 
-  return hours * 60 + minutes + Math.round(seconds / 60);
+  let totalMinutes = hours * 60 + minutes;
+  if (seconds > 0) { // Consider seconds for rounding or if they constitute a significant portion
+      totalMinutes += Math.round(seconds / 60);
+  }
+  return totalMinutes > 0 ? totalMinutes : null; // Return null if total minutes is 0 and no time was specified
 }
 
 // Helper function to parse servings string
@@ -47,31 +51,39 @@ export async function exportToTandoor(
   }
   const apiUrl = `${sanitizedUrl.replace(/\/$/, '')}/api/recipe/`;
 
-  const tandoorPayload: any = {
+  // Base payload structure
+  const tandoorPayload: { [key: string]: any } = {
     name: (recipeData.name || "Untitled Recipe").substring(0, 128),
     description: recipeData.description ? recipeData.description.substring(0, 512) : null,
     keywords: [],
     steps: [],
-    working_time: isoDurationToMinutes(recipeData.prepTime),
-    waiting_time: isoDurationToMinutes(recipeData.cookTime),
-    source_url: null, // Assuming not extracted, or add recipeData.url if available and fits schema
+    source_url: null, // Default, can be overridden if recipeData has a URL
     internal: false,
     show_ingredient_overview: false,
     nutrition: {
-        carbohydrates: "", // Tandoor example shows "string" type
+        carbohydrates: "",
         fats: "",
         proteins: "",
         calories: "",
         source: ""
     },
     properties: [],
-    servings: null,
     file_path: "",
-    servings_text: "",
     private: false,
     shared: []
   };
 
+  // Conditionally add time-related fields if they have values
+  const workingTime = isoDurationToMinutes(recipeData.prepTime);
+  if (workingTime !== null) {
+    tandoorPayload.working_time = workingTime;
+  }
+
+  const waitingTime = isoDurationToMinutes(recipeData.cookTime);
+  if (waitingTime !== null) {
+    tandoorPayload.waiting_time = waitingTime;
+  }
+  
   // Populate steps according to detailed Tandoor example
   if (recipeData.recipeInstructions && Array.isArray(recipeData.recipeInstructions)) {
     tandoorPayload.steps = recipeData.recipeInstructions.map((instructionItem: string | HowToStep, index: number) => {
@@ -84,17 +96,17 @@ export async function exportToTandoor(
         instructionText = String(instructionItem); // Fallback
       }
       
-      return {
+      const stepObject: { [key: string]: any } = {
         instruction: instructionText,
         name: "", // Tandoor example has 'name' for step, can be empty
         ingredients: [], // We don't have per-step ingredients from AI
-        time: null,      // Tandoor example has 'time', can be null
         order: index,    // Tandoor example has 'order'
         show_as_header: false, // Default
         show_ingredients_table: false // Default
-        // file: null, // Omit if not providing
-        // step_recipe: null // Omit if not providing
+        // 'time' field is omitted entirely as we don't have this data per step
+        // 'file' and 'step_recipe' are also omitted as they are optional and not provided
       };
+      return stepObject;
     }).filter(step => step.instruction.trim() !== "");
   }
   if (!tandoorPayload.steps || tandoorPayload.steps.length === 0) {
@@ -103,8 +115,11 @@ export async function exportToTandoor(
 
 
   const parsedServingsData = parseServings(recipeData.recipeYield);
-  tandoorPayload.servings = parsedServingsData.servings;
+  if (parsedServingsData.servings !== null) {
+    tandoorPayload.servings = parsedServingsData.servings;
+  }
   tandoorPayload.servings_text = parsedServingsData.servings_text;
+
 
   const keywordsSet = new Set<string>();
   if (recipeData.keywords && typeof recipeData.keywords === 'string') {
@@ -122,7 +137,7 @@ export async function exportToTandoor(
     if (trimmedCui) keywordsSet.add(trimmedCui);
   }
   // Tandoor keywords are objects: { name: "string", description: "string" }
-  tandoorPayload.keywords = Array.from(keywordsSet).map(kw => ({ name: kw, description: "" }));
+  tandoorPayload.keywords = Array.from(keywordsSet).map(kw => ({ name: kw.substring(0, 128), description: "" })); // Ensure keyword name length
   
   try {
     const response = await fetch(apiUrl, {
@@ -139,10 +154,9 @@ export async function exportToTandoor(
       try {
         const errorData = await response.json();
         if (errorData && typeof errorData === 'object') {
-          // Flatten error object for better readability if it's nested (like Tandoor's field errors)
           const fieldErrors = Object.entries(errorData)
             .map(([field, errors]) => {
-                if (typeof errors === 'object' && !Array.isArray(errors)) { // Handle nested objects for errors
+                if (typeof errors === 'object' && !Array.isArray(errors)) { 
                     return `${field}: { ${Object.entries(errors).map(([k,v]) => `${k}: ${v}`).join(', ')} }`;
                 }
                 return `${field}: ${(Array.isArray(errors) ? errors.join(', ') : String(errors))}`;

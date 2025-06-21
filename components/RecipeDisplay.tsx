@@ -30,6 +30,48 @@ const DownloadIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+// Helper function for clipboard operations
+async function copyToClipboard(textToCopy: string): Promise<boolean> {
+  // Try modern API first
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      return true;
+    } catch (err) {
+      console.warn("navigator.clipboard.writeText failed, trying fallback:", err);
+      // Fallthrough to legacy method if modern API fails
+    }
+  }
+
+  // Fallback for older browsers or when navigator.clipboard fails/is unavailable
+  const textArea = document.createElement("textarea");
+  textArea.value = textToCopy;
+  // Make the textarea non-editable and invisible
+  textArea.style.position = "fixed"; // Stay in viewport
+  textArea.style.top = "-9999px"; // Move off-screen top
+  textArea.style.left = "-9999px"; // Move off-screen left
+  textArea.setAttribute("readonly", ""); // Prevent keyboard popup on mobile
+
+  document.body.appendChild(textArea);
+  
+  let success = false;
+  try {
+    textArea.select();
+    // For mobile devices, setSelectionRange can be crucial
+    textArea.setSelectionRange(0, textToCopy.length); 
+    success = document.execCommand("copy");
+    if (!success) {
+      console.warn("document.execCommand('copy') returned false.");
+    }
+  } catch (err) {
+    console.error("Fallback document.execCommand('copy') failed:", err);
+    success = false;
+  }
+
+  document.body.removeChild(textArea);
+  return success;
+}
+
 
 export const RecipeDisplay: React.FC<RecipeDisplayProps> = ({ 
     recipeData, 
@@ -51,29 +93,27 @@ export const RecipeDisplay: React.FC<RecipeDisplayProps> = ({
 
   const handleCopyText = useCallback(async () => {
     if (format === 'text' && recipeTextForDisplay) {
-      try {
-        await navigator.clipboard.writeText(recipeTextForDisplay);
+      const success = await copyToClipboard(recipeTextForDisplay);
+      if (success) {
         setCopiedText(true);
         setCopiedJson(false); 
         setTimeout(() => setCopiedText(false), 2000);
-      } catch (err) {
-        console.error("Failed to copy text: ", err);
-        alert("Failed to copy recipe text. Please try selecting the text manually.");
+      } else {
+        alert("Failed to copy recipe text automatically. Please select the text and copy it manually.");
       }
     }
   }, [recipeTextForDisplay, format]);
 
   const handleCopyJson = useCallback(async () => {
     if (format === 'tandoorJson') {
-      try {
-        const jsonString = JSON.stringify(recipeData, null, 2);
-        await navigator.clipboard.writeText(jsonString);
+      const jsonString = JSON.stringify(recipeData, null, 2);
+      const success = await copyToClipboard(jsonString);
+      if (success) {
         setCopiedJson(true);
         setCopiedText(false); 
         setTimeout(() => setCopiedJson(false), 2000);
-      } catch (err) {
-        console.error("Failed to copy Tandoor JSON: ", err);
-        alert("Failed to copy Tandoor JSON. Please try again.");
+      } else {
+        alert("Failed to copy Tandoor JSON automatically. Please try selecting the text manually, or use the 'Show Raw JSON Data' option to select and copy.");
       }
     }
   }, [recipeData, format]);

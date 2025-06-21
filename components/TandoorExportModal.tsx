@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { LoadingSpinner } from './LoadingSpinner';
 
 interface TandoorExportModalProps {
@@ -7,6 +7,9 @@ interface TandoorExportModalProps {
   onExport: (tandoorUrl: string, apiKey: string) => Promise<void>;
   recipeName: string;
 }
+
+const TANDOOR_URL_LS_KEY = 'tandoorRecipeExporter_tandoorUrl';
+const TANDOOR_API_KEY_LS_KEY = 'tandoorRecipeExporter_apiKey';
 
 export const TandoorExportModal: React.FC<TandoorExportModalProps> = ({
   isOpen,
@@ -19,6 +22,26 @@ export const TandoorExportModal: React.FC<TandoorExportModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        const cachedUrl = localStorage.getItem(TANDOOR_URL_LS_KEY);
+        const cachedApiKey = localStorage.getItem(TANDOOR_API_KEY_LS_KEY);
+        if (cachedUrl) {
+          setTandoorUrl(cachedUrl);
+        }
+        if (cachedApiKey) {
+          setApiKey(cachedApiKey);
+        }
+      } catch (e) {
+        console.warn("Could not access localStorage for Tandoor credentials:", e);
+      }
+      // Reset success/error messages when modal is re-opened
+      setSuccess(null);
+      setError(null);
+    }
+  }, [isOpen]);
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTandoorUrl(e.target.value);
@@ -44,8 +67,15 @@ export const TandoorExportModal: React.FC<TandoorExportModalProps> = ({
     try {
       await onExport(tandoorUrl, apiKey);
       setSuccess(`Recipe "${recipeName}" successfully exported to Tandoor!`);
+      // Cache credentials on successful export
+      try {
+        localStorage.setItem(TANDOOR_URL_LS_KEY, tandoorUrl);
+        localStorage.setItem(TANDOOR_API_KEY_LS_KEY, apiKey);
+      } catch (e) {
+        console.warn("Could not save Tandoor credentials to localStorage:", e);
+      }
       // Optionally clear fields or auto-close after a delay
-      // setTandoorUrl('');
+      // setTandoorUrl(''); // Keep them filled for next time
       // setApiKey('');
       // setTimeout(onClose, 3000); 
     } catch (err) {
@@ -58,7 +88,7 @@ export const TandoorExportModal: React.FC<TandoorExportModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [tandoorUrl, apiKey, onExport, recipeName, onClose]);
+  }, [tandoorUrl, apiKey, onExport, recipeName]); // Removed onClose from dependencies for now to prevent re-caching empty if modal closes quickly
 
   if (!isOpen) {
     return null;
@@ -128,7 +158,7 @@ export const TandoorExportModal: React.FC<TandoorExportModalProps> = ({
               aria-describedby="api-key-description"
             />
              <p id="api-key-description" className="mt-1 text-xs text-slate-500">
-              Generate this from your Tandoor user profile (Personal Access Tokens).
+              Generate this from your Tandoor user profile (Personal Access Tokens). Details will be stored in your browser's local storage for convenience.
             </p>
           </div>
 

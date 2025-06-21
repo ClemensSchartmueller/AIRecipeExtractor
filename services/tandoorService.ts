@@ -12,9 +12,9 @@ function isoDurationToMinutes(durationStr: string | null | undefined): number | 
 
   const hours = parseInt(matches[1] || '0', 10);
   const minutes = parseInt(matches[2] || '0', 10);
-  const seconds = parseInt(matches[3] || '0', 10); // Seconds can be included for precision
+  const seconds = parseInt(matches[3] || '0', 10);
 
-  return hours * 60 + minutes + Math.round(seconds / 60); // Round seconds to nearest minute or just add if needed
+  return hours * 60 + minutes + Math.round(seconds / 60);
 }
 
 // Helper function to parse servings string
@@ -30,8 +30,7 @@ function parseServings(yieldStr: string | null | undefined): ParsedServings {
   const match = yieldStr.match(/(\d+)/);
   const num = match ? parseInt(match[0], 10) : null;
 
-  // Ensure servings_text does not exceed 32 characters
-  const servingsText = yieldStr.length > 32 ? yieldStr.substring(0, 32) : yieldStr;
+  const servingsText = defaultServingsText.length > 32 ? defaultServingsText.substring(0, 32) : defaultServingsText;
 
   return { servings: num, servings_text: servingsText };
 }
@@ -42,73 +41,71 @@ export async function exportToTandoor(
   apiKey: string,
   recipeData: RecipeData
 ): Promise<void> {
-  // Validate and sanitize the base URL
   let sanitizedUrl = tandoorBaseUrl.trim();
   if (!sanitizedUrl.startsWith('http://') && !sanitizedUrl.startsWith('https://')) {
     throw new Error('Invalid Tandoor URL: Must start with http:// or https://');
   }
   const apiUrl = `${sanitizedUrl.replace(/\/$/, '')}/api/recipe/`;
 
-  // Initialize with Tandoor's default structure and map RecipeData
   const tandoorPayload: any = {
-    name: recipeData.name || "Untitled Recipe",
-    description: recipeData.description || null, // Per schema: string or null
-    keywords: [], // Initialize as empty array, to be populated with objects
-    steps: [],    // Initialize as empty array
+    name: (recipeData.name || "Untitled Recipe").substring(0, 128),
+    description: recipeData.description ? recipeData.description.substring(0, 512) : null,
+    keywords: [],
+    steps: [],
     working_time: isoDurationToMinutes(recipeData.prepTime),
     waiting_time: isoDurationToMinutes(recipeData.cookTime),
-    source_url: null, // Per schema: string or null
+    source_url: null, // Assuming not extracted, or add recipeData.url if available and fits schema
     internal: false,
     show_ingredient_overview: false,
-    nutrition: { // Per schema: object or null. Sending object with nulls.
-        carbohydrates: null,
-        fats: null,
-        proteins: null,
-        calories: null,
-        source: "" // Assuming empty string is fine for source if null
+    nutrition: {
+        carbohydrates: "", // Tandoor example shows "string" type
+        fats: "",
+        proteins: "",
+        calories: "",
+        source: ""
     },
-    properties: [], // Per schema: Array of objects
-    servings: null, 
-    file_path: "", // Per schema: string. Max 512. Empty string is fine.
-    servings_text: "", 
+    properties: [],
+    servings: null,
+    file_path: "",
+    servings_text: "",
     private: false,
-    shared: [] // Per schema: Array of objects
+    shared: []
   };
-   // Ensure name does not exceed 128 characters
-  if (tandoorPayload.name.length > 128) {
-    tandoorPayload.name = tandoorPayload.name.substring(0, 128);
-  }
-   // Ensure description does not exceed 512 characters
-  if (tandoorPayload.description && tandoorPayload.description.length > 512) {
-    tandoorPayload.description = tandoorPayload.description.substring(0, 512);
-  }
 
-  // Populate steps
+  // Populate steps according to detailed Tandoor example
   if (recipeData.recipeInstructions && Array.isArray(recipeData.recipeInstructions)) {
-    tandoorPayload.steps = recipeData.recipeInstructions.map((instruction: string | HowToStep) => {
-      let text = "";
-      if (typeof instruction === 'string') {
-        text = instruction;
-      } else if (typeof instruction === 'object' && instruction.text) { // HowToStep
-        text = instruction.text;
+    tandoorPayload.steps = recipeData.recipeInstructions.map((instructionItem: string | HowToStep, index: number) => {
+      let instructionText = "";
+      if (typeof instructionItem === 'string') {
+        instructionText = instructionItem;
+      } else if (typeof instructionItem === 'object' && instructionItem.text) {
+        instructionText = instructionItem.text;
       } else {
-        text = String(instruction);
+        instructionText = String(instructionItem); // Fallback
       }
-      return { text: text }; // Tandoor expects objects for steps like { "text": "Instruction text" }
-    }).filter(step => step.text.trim() !== "");
+      
+      return {
+        instruction: instructionText,
+        name: "", // Tandoor example has 'name' for step, can be empty
+        ingredients: [], // We don't have per-step ingredients from AI
+        time: null,      // Tandoor example has 'time', can be null
+        order: index,    // Tandoor example has 'order'
+        show_as_header: false, // Default
+        show_ingredients_table: false // Default
+        // file: null, // Omit if not providing
+        // step_recipe: null // Omit if not providing
+      };
+    }).filter(step => step.instruction.trim() !== "");
   }
-  // Ensure steps is present as an empty array if no instructions
   if (!tandoorPayload.steps || tandoorPayload.steps.length === 0) {
-     tandoorPayload.steps = [];
+     tandoorPayload.steps = []; // Ensure steps is always an array, even if empty
   }
 
 
-  // Populate servings
   const parsedServingsData = parseServings(recipeData.recipeYield);
   tandoorPayload.servings = parsedServingsData.servings;
   tandoorPayload.servings_text = parsedServingsData.servings_text;
 
-  // Populate keywords - Tandoor expects an array of objects: { "name": "keyword_name" }
   const keywordsSet = new Set<string>();
   if (recipeData.keywords && typeof recipeData.keywords === 'string') {
     recipeData.keywords.split(',').forEach(kw => {
@@ -124,7 +121,8 @@ export async function exportToTandoor(
     const trimmedCui = recipeData.recipeCuisine.trim();
     if (trimmedCui) keywordsSet.add(trimmedCui);
   }
-  tandoorPayload.keywords = Array.from(keywordsSet).map(kw => ({ name: kw }));
+  // Tandoor keywords are objects: { name: "string", description: "string" }
+  tandoorPayload.keywords = Array.from(keywordsSet).map(kw => ({ name: kw, description: "" }));
   
   try {
     const response = await fetch(apiUrl, {
@@ -141,9 +139,16 @@ export async function exportToTandoor(
       try {
         const errorData = await response.json();
         if (errorData && typeof errorData === 'object') {
+          // Flatten error object for better readability if it's nested (like Tandoor's field errors)
           const fieldErrors = Object.entries(errorData)
-            .map(([field, errors]) => `${field}: ${(Array.isArray(errors) ? errors.join(', ') : String(errors))}`)
+            .map(([field, errors]) => {
+                if (typeof errors === 'object' && !Array.isArray(errors)) { // Handle nested objects for errors
+                    return `${field}: { ${Object.entries(errors).map(([k,v]) => `${k}: ${v}`).join(', ')} }`;
+                }
+                return `${field}: ${(Array.isArray(errors) ? errors.join(', ') : String(errors))}`;
+            })
             .join('; ');
+            
           if (fieldErrors) {
             errorMessage += ` Details: {${fieldErrors}}`;
           } else if (errorData.detail) { 
@@ -174,7 +179,7 @@ export async function exportToTandoor(
         throw new Error(`Network error or Tandoor instance unreachable. Check URL and CORS settings on your Tandoor instance if this is a self-hosted setup. Original: ${error.message}`);
     }
     if (error instanceof Error) {
-        throw error;
+        throw error; // Rethrow the already specific error
     }
     throw new Error(`An unexpected error occurred during Tandoor export: ${String(error)}`);
   }

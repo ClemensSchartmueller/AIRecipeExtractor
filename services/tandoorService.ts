@@ -99,18 +99,68 @@ export async function exportToTandoor(
       const stepObject: { [key: string]: any } = {
         instruction: instructionText,
         name: "", // Tandoor example has 'name' for step, can be empty
-        ingredients: [], // We don't have per-step ingredients from AI
+        ingredients: [], // Initialize ingredients array for each step
         order: index,    // Tandoor example has 'order'
         show_as_header: false, // Default
         show_ingredients_table: false // Default
-        // 'time' field is omitted entirely as we don't have this data per step
-        // 'file' and 'step_recipe' are also omitted as they are optional and not provided
+        // 'time' field is omitted from step object
       };
       return stepObject;
     }).filter(step => step.instruction.trim() !== "");
   }
   if (!tandoorPayload.steps || tandoorPayload.steps.length === 0) {
-     tandoorPayload.steps = []; // Ensure steps is always an array, even if empty
+     tandoorPayload.steps = [{ // Add a default empty step if none were parsed, so ingredients can be added
+        instruction: "No instructions provided.",
+        name: "",
+        ingredients: [],
+        order: 0,
+        show_as_header: false,
+        show_ingredients_table: false
+     }];
+  }
+
+  // Add all ingredients to the first step
+  if (tandoorPayload.steps.length > 0 && recipeData.recipeIngredient && Array.isArray(recipeData.recipeIngredient)) {
+    recipeData.recipeIngredient.forEach((ingredientString, index) => {
+        const tandoorIngredient = {
+            food: { 
+                name: ingredientString.substring(0, 128), // Max length for food name
+                plural_name: "", // Default
+                description: "", // Default
+                // recipe: null, // Omit complex nested objects not directly available
+                // url: null,
+                // properties: [],
+                // properties_food_amount: null,
+                // properties_food_unit: null,
+                // fdc_id: null,
+                // food_onhand: null,
+                // supermarket_category: null,
+                // inherit_fields: [],
+                // ignore_shopping: false,
+                // substitute: [],
+                // substitute_siblings: false,
+                // substitute_children: false,
+                // child_inherit_fields: [],
+                open_data_slug: null // Default
+            },
+            unit: { 
+                name: "", // We don't parse unit
+                plural_name: "", // Default
+                description: "", // Default
+                base_unit: null, // Default
+                open_data_slug: null // Default
+            },
+            amount: "", // We don't parse amount
+            note: "", // Default
+            order: index, // Order within the step's ingredients list
+            is_header: false, // Default
+            no_amount: true, // Since we are not providing a parsed amount
+            original_text: ingredientString,
+            always_use_plural_unit: false, // Default
+            always_use_plural_food: false // Default
+        };
+        tandoorPayload.steps[0].ingredients.push(tandoorIngredient);
+    });
   }
 
 

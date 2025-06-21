@@ -101,6 +101,73 @@ How you set this variable depends on your development and deployment environment
 5.  The AI will process the image and display the extracted recipe and a generated dish image.
 6.  You can then copy the text or JSON output, or download the generated dish image.
 
+## Tandoor API Export and CORS Configuration
+
+This application features the ability to export recipes directly to your [Tandoor Recipes](https://tandoor.dev/) instance. When the "Tandoor (JSON-LD)" output format is selected, an "Export to Tandoor" button will appear. Clicking this button opens a modal where you can enter your Tandoor instance URL and a Personal Access Token (API Key) generated from your Tandoor user profile.
+
+**Important Note on CORS (Cross-Origin Resource Sharing):**
+
+For the export to Tandoor to work, your Tandoor instance (especially if self-hosted and behind a reverse proxy like Nginx) must be configured to accept requests from the domain where this AI Recipe Extractor application is running. This is a security measure browsers enforce.
+
+If your Tandoor instance does not send the correct CORS headers, your browser will block the export request, and you'll likely see an error in the browser console similar to "Access to fetch at '...' from origin '...' has been blocked by CORS policy...".
+
+**Nginx Configuration Example for Tandoor CORS:**
+
+If you are using Nginx as a reverse proxy for your Tandoor instance, you'll need to modify its configuration to add the necessary CORS headers. The configuration file is often located at `/etc/nginx/conf.d/tandoor.conf` or a similar path.
+
+Here's an example configuration snippet:
+
+```nginx
+server {
+    listen 8002; # Or your Tandoor's listening port
+    #access_log /var/log/nginx/access.log;
+    #error_log /var/log/nginx/error.log;
+    client_max_body_size 128M;
+
+    # Set a variable for the allowed CORS origin.
+    # IMPORTANT: Change 'http://airecipes.box:5173' to the actual URL
+    # where YOUR AI Recipe Extractor app is deployed and accessed from.
+    set $cors_origin 'http://airecipes.box:5173';
+
+    location /static/ {
+        alias /opt/tandoor/staticfiles/;
+    }
+
+    location /media/ {
+        alias /opt/tandoor/mediafiles/;
+    }
+
+    location / {
+        # --- Preflight (OPTIONS) Request Handling ---
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' $cors_origin always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH' always;
+            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+            add_header 'Access-Control-Max-Age' 1728000 always;
+            add_header 'Content-Type' 'text/plain; charset=utf-8';
+            return 204; # HTTP 204 No Content for OPTIONS
+        }
+
+        # --- Actual API Request Handling ---
+        # Add CORS headers to all responses from the proxied application.
+        add_header 'Access-Control-Allow-Origin' $cors_origin always;
+        add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+
+        # Proxy to your Tandoor application
+        proxy_set_header Host $http_host;
+        proxy_pass http://unix:/opt/tandoor/tandoor.sock; # Or your Tandoor upstream (e.g., http://localhost:8000)
+    }
+}
+```
+
+**Key points for the Nginx configuration:**
+*   **`set $cors_origin 'http://airecipes.box:5173';`**: This line is crucial. You **must** replace `'http://airecipes.box:5173'` with the actual URL (including protocol and port if non-standard) from which you are accessing the AI Recipe Extractor app. If you are running it locally, this might be `http://localhost:3000` or a similar address.
+*   The `location /` block handles requests to your Tandoor application. The `if ($request_method = 'OPTIONS')` block specifically manages preflight requests.
+*   The `add_header` directives ensure the browser receives permission to make the request.
+*   After modifying your Nginx configuration, remember to test it (`sudo nginx -t`) and then reload Nginx (`sudo systemctl reload nginx` or similar command for your OS).
+
+Alternatively, Tandoor itself has environment variables (like `TANDOOR_CORS_ALLOWED_ORIGINS` in its `.env` file) that can be used to configure CORS. However, if using a reverse proxy, managing CORS headers at the proxy level (like in Nginx) is often a robust approach. Ensure only one layer (either Tandoor app or the proxy) is primarily responsible for setting these headers to avoid conflicts.
+
 ## DEPLOYING
 1. To deploy, make sure to add a `ALLOWED_HOSTS` environment variable with allowed domains pointing at the host (e.g. `ALLOWED_HOSTS=aire.abc`).
 2. Build the application `npm run build`.

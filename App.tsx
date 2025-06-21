@@ -4,6 +4,7 @@ import { ImageUploader } from './components/ImageUploader';
 import { RecipeDisplay } from './components/RecipeDisplay';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { OutputFormatSelector } from './components/OutputFormatSelector';
+import { GenerateImageCheckbox } from './components/GenerateImageCheckbox';
 import { extractRecipeFromImage, generateDishImage } from './services/geminiService';
 import { fileToBase64 } from './utils/imageUtils';
 import { RecipeData, OutputFormat } from './types';
@@ -15,6 +16,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('text');
+  const [shouldGenerateDishImage, setShouldGenerateDishImage] = useState<boolean>(true);
 
   const [generatedDishImageUrl, setGeneratedDishImageUrl] = useState<string | null>(null);
   const [isGeneratingDishImage, setIsGeneratingDishImage] = useState<boolean>(false);
@@ -27,46 +29,56 @@ const App: React.FC = () => {
     setImagePreviewUrl(previewUrl);
     setRecipeData(null);
     setError(null);
+    
+    // Reset image generation states for every new upload
     setGeneratedDishImageUrl(null);
     setDishImageError(null);
+    setIsGeneratingDishImage(false);
+    
     setIsLoading(true);
-    setIsGeneratingDishImage(false); // Reset
 
     try {
       const imageBase64 = await fileToBase64(file);
       const extractedData = await extractRecipeFromImage(imageBase64, file.type);
       setRecipeData(extractedData);
-      setError(null); // Clear previous text extraction errors
+      setError(null); 
 
-      if (extractedData && extractedData.dishImageDescription) {
-        setIsGeneratingDishImage(true);
-        setDishImageError(null);
-        try {
-          const dishImageResult = await generateDishImage(extractedData.dishImageDescription);
-          if (dishImageResult) {
-            setGeneratedDishImageUrl(`data:${dishImageResult.mimeType};base64,${dishImageResult.base64Data}`);
-          } else {
-            // No image generated, but not necessarily an "error" to show user, could be mild warning or just nothing
-            console.log("No dish image was generated for the description.");
-          }
-        } catch (imgErr) {
+      // Image Generation Logic
+      if (shouldGenerateDishImage) {
+        if (extractedData && extractedData.dishImageDescription) {
+          setIsGeneratingDishImage(true);
+          // dishImageError is already null from the reset above
+          try {
+            const dishImageResult = await generateDishImage(extractedData.dishImageDescription);
+            if (dishImageResult) {
+              setGeneratedDishImageUrl(`data:${dishImageResult.mimeType};base64,${dishImageResult.base64Data}`);
+              // dishImageError remains null (success)
+            } else {
+              // API returned null, but no error thrown
+              setDishImageError("An image could not be generated based on the description (the AI did not return an image).");
+            }
+          } catch (imgErr) {
             console.error("Error generating dish image:", imgErr);
-            // Set a specific error for the dish image part, don't overwrite main recipe error
             setDishImageError(imgErr instanceof Error ? imgErr.message : "Failed to generate dish image.");
-        } finally {
+          } finally {
             setIsGeneratingDishImage(false);
+          }
+        } else { // shouldGenerateDishImage is true, but no description from recipe
+          setDishImageError("No dish image description was found in the recipe to generate an image from.");
+          // isGeneratingDishImage remains false as no API call is made
         }
       }
+      // If shouldGenerateDishImage is false, image states (URL, error, loading) remain at their reset values (null/false)
 
     } catch (err) {
       console.error("Error in handleImageUpload:", err);
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred during recipe extraction.";
       setError(errorMessage.startsWith("Gemini API Error:") || errorMessage.startsWith("Failed to extract recipe via AI:") ? errorMessage : `Failed to process recipe: ${errorMessage}`);
-      setRecipeData(null); // Ensure no stale recipe data on error
+      setRecipeData(null); 
     } finally {
-      setIsLoading(false); // Main loading for recipe text
+      setIsLoading(false); 
     }
-  }, []);
+  }, [shouldGenerateDishImage]);
 
   const clearSelection = () => {
     setSelectedFile(null);
@@ -80,6 +92,7 @@ const App: React.FC = () => {
     setGeneratedDishImageUrl(null);
     setIsGeneratingDishImage(false);
     setDishImageError(null);
+    // setShouldGenerateDishImage(true); // Optionally reset this to default
   };
 
   return (
@@ -97,11 +110,16 @@ const App: React.FC = () => {
         {!selectedFile && !isLoading && (
           <>
             <OutputFormatSelector selectedFormat={outputFormat} onFormatChange={setOutputFormat} />
+            <GenerateImageCheckbox 
+              checked={shouldGenerateDishImage} 
+              onChange={setShouldGenerateDishImage}
+              disabled={isLoading}
+            />
             <ImageUploader onImageUpload={handleImageUpload} disabled={isLoading} />
           </>
         )}
 
-        {isLoading && !recipeData && ( // Show main loader only if recipe data is not yet set
+        {isLoading && !recipeData && ( 
           <div className="text-center py-10">
             <LoadingSpinner />
             <p className="mt-4 text-lg font-medium text-slate-700">Extracting recipe, please hold on...</p>
@@ -141,7 +159,7 @@ const App: React.FC = () => {
           </div>
         )}
         
-        {recipeData && !isLoading && ( // recipeData is available, main loading is done
+        {recipeData && !isLoading && ( 
           <>
             {imagePreviewUrl && (
               <div className="space-y-4">
@@ -172,7 +190,7 @@ const App: React.FC = () => {
           </>
         )}
         
-        {selectedFile && !isLoading && !recipeData && !error && ( // Image selected, processing started but no data/error yet (text part)
+        {selectedFile && !isLoading && !recipeData && !error && ( 
            <div className="text-center py-6">
              <p className="text-slate-600">Image loaded. Processing recipe text...</p>
            </div>

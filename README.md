@@ -39,7 +39,7 @@ The goal is to make it easy for you to get recipes from images (like those from 
 *   **Frontend**: React, TypeScript
 *   **Styling**: Tailwind CSS
 *   **AI Models**:
-    *   Google Gemini API (`gemini-2.5-flash-preview-04-17`) for recipe text extraction.
+    *   Google Gemini API (`gemini-2.5-flash`) for recipe text extraction.
     *   Google Imagen API (`imagen-3.0-generate-002`) for dish image generation.
 
 ## Prerequisites

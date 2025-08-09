@@ -2,7 +2,7 @@ import { GoogleGenAI, GenerateContentResponse, Part } from "@google/genai";
 import { RecipeData } from "../types"; // Assuming RecipeData type
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
-const TEXT_MODEL_NAME = 'gemini-2.5-flash-preview-04-17';
+const TEXT_MODEL_NAME = 'gemini-2.5-flash';
 const IMAGE_MODEL_NAME = 'imagen-3.0-generate-002';
 
 function ensureApiKey() {

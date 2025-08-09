@@ -40,7 +40,7 @@ Optional fields to extract if clearly identifiable from the image:
 - recipeCategory: Category (e.g., 'Dessert', 'Main Course').
 - recipeCuisine: Cuisine type (e.g., 'Italian', 'Mexican').
 - keywords: A string of comma-separated keywords.
-- dishImageDescription: If the screenshot contains a clear visual of the final prepared dish itself, provide a concise visual description of this dish suitable for an image generation model (e.g., "A stack of fluffy pancakes with syrup and berries", "A close-up of a rich chocolate lava cake with oozing center"). If no clear dish image is present or identifiable, set this field to null.
+- dishImageDescription: Provide a concise visual description of the final prepared dish suitable for an image generation model. If the screenshot contains a clear visual of the dish, describe it directly (e.g., "A stack of fluffy pancakes with syrup and berries"). If no clear dish image is present, create a plausible, appealing description based on the recipe's 'name' and 'description' fields (e.g., for a recipe named "Blueberry Muffins", generate a description like "Warm, golden-brown blueberry muffins bursting with fresh berries, sitting on a cooling rack"). This field must always contain a string and must not be null.
 
 If any optional fields cannot be reliably extracted, omit them or set their value to null.
 Ensure the output is ONLY a single, valid JSON object. Do not include any explanatory text or markdown formatting outside of the JSON structure itself.

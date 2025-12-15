@@ -1,3 +1,5 @@
+# Project Archived and discontinued -> Superseded by [VibeRecipe](https://github.com/ClemensSchartmueller/viberecipe)
+
 # AI Recipe Extractor
 
 [![AI Generated project](https://img.shields.io/badge/Project%20Status-AI%20Generated-informational?style=flat-square)](https://shields.io/)
